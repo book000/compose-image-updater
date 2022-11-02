@@ -12,7 +12,7 @@ You can specify the Discord webhook URL in `discord_webhook_url.txt` to be notif
 
 ## Installation
 
-1. `git clone https://github.com/book000/compose-image-wrapper.git`
+1. `git clone https://github.com/book000/compose-image-updater.git`
 2. Change the tag of the image you want to target for automatic updates to `latest`. (e.g. `hello-world:v1.0.0` -> `hello-world:latest`)
 3. (Optional) Get discord webhook url and Write to `/path/to/discord_webhook_url.txt`
 
