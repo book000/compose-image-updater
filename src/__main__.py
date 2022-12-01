@@ -2,11 +2,17 @@ import os
 import sys
 from pprint import pprint
 
-from src import get_latest_tag_images, pull_images, send_to_discord
+from src import get_compose_images, get_latest_tag_images, pull_images, send_to_discord
 
 
 def update_images(cwd: str):
-    prev_versions = get_latest_tag_images(cwd)
+    try:
+        images = get_compose_images(cwd)
+    except Exception as e:
+        print(f"[ERROR] Failed to get docker-compose images: {e}")
+        return None
+
+    prev_versions = get_latest_tag_images(images)
     if prev_versions is None:
         return None
     pprint(prev_versions)
@@ -16,7 +22,7 @@ def update_images(cwd: str):
         print("[ERROR] Failed to update images")
         return None
 
-    versions = get_latest_tag_images(cwd)
+    versions = get_latest_tag_images(images)
     if versions is None:
         return None
     pprint(versions)
