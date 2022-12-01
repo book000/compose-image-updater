@@ -43,13 +43,7 @@ def get_image_version(image_data: dict):
     return None
 
 
-def get_latest_tag_images(cwd: str):
-    try:
-        images = get_compose_images(cwd)
-    except Exception as e:
-        print(f"[ERROR] Failed to get docker-compose images: {e}")
-        return None
-
+def get_latest_tag_images(images: list[list[str]]):
     # check latest tag image
     if len(list(filter(lambda img: img[2] == "latest", images))) == 0:
         print("No latest tag image found")
