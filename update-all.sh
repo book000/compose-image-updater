@@ -1,6 +1,4 @@
 #!/bin/sh
-set -e
-
 PROJECTS_DIR="$1"
 LOG_DIR="$2"
 
