@@ -88,6 +88,23 @@ def pull_images(cwd: str):
     return result.returncode == 0
 
 
+def restart_containers(cwd: str):
+    result = subprocess.run(["docker-compose", "restart"], cwd=cwd)
+    return result.returncode == 0
+
+
+def get_error_log_count(cwd: str):
+    result = subprocess.run(["docker-compose", "logs", "--tail=100"], cwd=cwd, capture_output=True)
+    if result.returncode != 0:
+        raise Exception("Failed to get docker-compose logs")
+
+    stdout = result.stdout.decode("utf-8")
+    lines = stdout.splitlines()
+    lines = [line for line in lines if line]
+    lines = list(filter(lambda line: "ERROR" in line or "error" in line, lines))
+    return len(lines)
+
+
 def send_to_discord(discord_webhook_url, message, embed=None):
     headers = {
         "Content-Type": "application/json",
