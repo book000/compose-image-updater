@@ -23,7 +23,7 @@ You can specify the Discord webhook URL in `discord_webhook_url.txt` to be notif
 The following can be added to cron to pull all projects under a specific directory at once.
 
 ```cron
-0 * * * * /path/to/compose-image-updater/update.sh
+0 * * * * /path/to/compose-image-updater/update-all.sh /path/to/projects/ /path/to/logs/
 ```
 
 ### Use Systemd `ExecStartPre` property
