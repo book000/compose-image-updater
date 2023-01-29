@@ -1,8 +1,21 @@
+import json
 import os
 import sys
+import time
 from pprint import pprint
 
-from src import get_compose_images, get_latest_tag_images, pull_images, send_to_discord
+from src import get_compose_images, get_error_log_count, get_latest_tag_images, pull_images, restart_containers, \
+    send_to_discord
+
+
+def is_restartable_project(cwd: str):
+    # restartable_projects.json を読む
+    # ディレクトリ名があれば True を返す
+    if not os.path.exists("restartable_projects.json"):
+        return False
+    with open("restartable_projects.json") as f:
+        projects = json.load(f)
+    return cwd.split("/")[-1] in projects
 
 
 def update_images(cwd: str):
@@ -54,26 +67,53 @@ def main():
         print("[INFO] Update not found")
         return
 
+    restart_status = 'NOT-RESTARTABLE'
+    error_log_count = 0
+    if is_restartable_project(cwd):
+        print("[INFO] Restarting project")
+        result = restart_containers(cwd)
+        restart_status = "SUCCESS" if result else "FAILED"
+        if result:
+            # wait 10 seconds
+            time.sleep(10)
+            error_log_count = get_error_log_count(cwd)
+
     discord_webhook_url = os.getenv("DISCORD_WEBHOOK_URL")
     if discord_webhook_url is None:
         print("[INFO] Discord webhook url id not found")
         return
 
+    title = {
+        "SUCCESS": "Docker image updated and restarted (%s)",
+        "FAILED": "Docker image updated but FAILED to restart (%s)",
+        "NOT-RESTARTABLE": "Docker image updated (%s)",
+    }[restart_status]
+    description = {
+        "SUCCESS": None if error_log_count == 0 else f"But after restarted found error: {error_log_count}",
+        "FAILED": "Please check the project manually",
+        "NOT-RESTARTABLE": "Please apply the update with `docker-compose down && docker-compose up --build -d`."
+    }[restart_status]
+    color = {
+        "SUCCESS": 0x00ff00 if error_log_count == 0 else 0xffa500,  # green or orange
+        "FAILED": 0xff0000,  # red
+        "NOT-RESTARTABLE": 0xffff00,  # yellow
+    }[restart_status]
+
     send_to_discord(discord_webhook_url, "", {
-        "title": "Docker image updated (%s)" % cwd.split("/")[-1],
-        "description": "Please apply the update with `docker-compose down && docker-compose up --build -d`.\n"
-                       "Target directory: %s" % cwd,
+        "title": title % cwd.split("/")[-1],
+        "description": "%s\nTarget directory: %s" % (description, cwd),
         "fields": [
             {
                 "name": image_name,
                 "value": f"prev: {image['prev']}\ncurrent: {image['current']}",
+                "inline": True,
             }
             for image_name, image in res.items()
         ],
         "footer": {
             "text": "Hostname: %s" % os.uname()[1],
         },
-        "color": 0x00ff00,
+        "color": color,
     })
 
 

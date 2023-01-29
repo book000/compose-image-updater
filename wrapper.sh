@@ -2,11 +2,11 @@
 set -e
 
 if [ $# != 1 ]; then
-    cwd="$PWD"
+    cwd="${PWD}"
 else
     cwd="$1"
 fi
-echo "Target directory: $cwd"
+echo "Target directory: ${cwd}"
 
 # Change to the directory where the script is located
 cd "$(dirname "$0")" || exit 1
@@ -31,10 +31,10 @@ fi
 pip install -r requirements.txt
 
 # Run the update script
-if ! python3 -m src "$cwd"; then
+if ! python3 -m src "${cwd}"; then
     echo "Error: Failed to run the script"
     exit 1
 fi
 
 # Change back to the original directory
-cd "$cwd" || exit 1
+cd "${cwd}" || exit 1

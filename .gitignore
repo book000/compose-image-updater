@@ -1,3 +1,5 @@
 .idea
 venv
 discord_webhook_url.txt
+logs
+*.pyc

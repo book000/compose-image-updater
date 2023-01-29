@@ -20,10 +20,10 @@ You can specify the Discord webhook URL in `discord_webhook_url.txt` to be notif
 
 ### Regularly update all projects
 
-The following code can be used to batch update projects located under a specific directory using cron or other means.
+The following can be added to cron to pull all projects under a specific directory at once.
 
-```sh
-find /path/to/projects/ -maxdepth 2 -name docker-compose.yml | xargs dirname | xargs -L1 /path/to/wrapper.sh
+```cron
+0 * * * * /path/to/compose-image-updater/update.sh
 ```
 
 ### Use Systemd `ExecStartPre` property
