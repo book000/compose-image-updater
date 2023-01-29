@@ -3,3 +3,4 @@ venv
 discord_webhook_url.txt
 logs
 *.pyc
+restartable_projects.json
