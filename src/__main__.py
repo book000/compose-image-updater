@@ -11,7 +11,7 @@ from src import get_compose_images, get_error_log_count, get_latest_tag_images, 
 def is_restartable_project(cwd: str):
     # restartable_projects.json を読む
     # ディレクトリ名があれば True を返す
-    path = os.path.join(os.path.abspath(os.path.dirname(__file__)), "restartable_projects.json")
+    path = os.path.join(os.path.abspath(os.path.dirname(os.path.dirname(__file__))), "restartable_projects.json")
     if not os.path.exists(path):
         return False
     with open(path) as f:
