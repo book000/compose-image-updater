@@ -4,8 +4,9 @@ import sys
 import time
 from pprint import pprint
 
-from src import get_compose_images, get_error_log_count, get_latest_tag_images, pull_images, restart_containers, \
-    send_to_discord
+from src import (down_containers, get_compose_images, get_error_log_count,
+                 get_latest_tag_images, pull_images, send_to_discord,
+                 up_containers)
 
 
 def is_restartable_project(cwd: str):
@@ -72,9 +73,17 @@ def main():
     error_log_count = 0
     if is_restartable_project(cwd):
         print("[INFO] Restarting project")
-        result = restart_containers(cwd)
-        restart_status = "SUCCESS" if result else "FAILED"
-        if result:
+        down_result = down_containers(cwd)
+        up_result = up_containers(cwd)
+        if not down_result and up_result:
+            restart_status = "FAILED (DOWN)"
+        if down_result and not up_result:
+            restart_status = "FAILED (UP)"
+        if not down_result and not up_result:
+            restart_status = "FAILED (DOWN & UP)"
+
+        if down_result and up_result:
+            restart_status = "SUCCESS"
             # wait 10 seconds
             time.sleep(10)
             error_log_count = get_error_log_count(cwd)
@@ -90,7 +99,7 @@ def main():
         "NOT-RESTARTABLE": "Docker image updated (%s)",
     }[restart_status]
     description = {
-        "SUCCESS": None if error_log_count == 0 else f"But after restarted found error: {error_log_count}",
+        "SUCCESS": "" if error_log_count == 0 else f"But after restarted found error: {error_log_count}\n",
         "FAILED": "Please check the project manually",
         "NOT-RESTARTABLE": "Please apply the update with `docker-compose down && docker-compose up --build -d`."
     }[restart_status]
@@ -102,7 +111,7 @@ def main():
 
     send_to_discord(discord_webhook_url, "", {
         "title": title % cwd.split("/")[-1],
-        "description": "%s\nTarget directory: %s" % (description, cwd),
+        "description": "%sTarget directory: %s" % (description, cwd),
         "fields": [
             {
                 "name": image_name,

@@ -88,8 +88,13 @@ def pull_images(cwd: str):
     return result.returncode == 0
 
 
-def restart_containers(cwd: str):
-    result = subprocess.run(["docker-compose", "restart"], cwd=cwd)
+def down_containers(cwd: str):
+    result = subprocess.run(["docker-compose", "down"], cwd=cwd)
+    return result.returncode == 0
+
+
+def up_containers(cwd: str):
+    result = subprocess.run(["docker-compose", "up", "--build"], cwd=cwd)
     return result.returncode == 0
 
 
