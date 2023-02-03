@@ -6,9 +6,9 @@ import requests
 
 
 def get_compose_images(cwd: str):
-    result = subprocess.run(["docker-compose", "images"], cwd=cwd, capture_output=True)
+    result = subprocess.run(["docker", "compose", "images"], cwd=cwd, capture_output=True)
     if result.returncode != 0:
-        raise Exception("Failed to get docker-compose images")
+        raise Exception("Failed to get docker compose images")
 
     stdout = result.stdout.decode("utf-8")
     lines = stdout.splitlines()
@@ -84,24 +84,24 @@ def get_latest_tag_images(images: list[list[str]]):
 
 
 def pull_images(cwd: str):
-    result = subprocess.run(["docker-compose", "pull"], cwd=cwd)
+    result = subprocess.run(["docker", "compose", "pull"], cwd=cwd)
     return result.returncode == 0
 
 
 def down_containers(cwd: str):
-    result = subprocess.run(["docker-compose", "down"], cwd=cwd)
+    result = subprocess.run(["docker", "compose", "down"], cwd=cwd)
     return result.returncode == 0
 
 
 def up_containers(cwd: str):
-    result = subprocess.run(["docker-compose", "up", "--build"], cwd=cwd)
+    result = subprocess.run(["docker", "compose", "up", "--build"], cwd=cwd)
     return result.returncode == 0
 
 
 def get_error_log_count(cwd: str):
-    result = subprocess.run(["docker-compose", "logs", "--tail=100"], cwd=cwd, capture_output=True)
+    result = subprocess.run(["docker", "compose", "logs", "--tail=100"], cwd=cwd, capture_output=True)
     if result.returncode != 0:
-        raise Exception("Failed to get docker-compose logs")
+        raise Exception("Failed to get docker compose logs")
 
     stdout = result.stdout.decode("utf-8")
     lines = stdout.splitlines()

@@ -28,7 +28,7 @@ The following can be added to cron to pull all projects under a specific directo
 
 ### Use Systemd `ExecStartPre` property
 
-If you have `docker-compose up` in Systemd, you can specify the `ExecStartPre` property to perform the update process before startup.
+If you have `docker compose up` in Systemd, you can specify the `ExecStartPre` property to perform the update process before startup.
 
 ```ini
 [Unit]
@@ -39,7 +39,7 @@ User=root
 Group=root
 WorkingDirectory=/path/to/project/
 ExecStartPre=/path/to/wrapper.sh # <- this!
-ExecStart=/usr/local/bin/docker-compose up --build
+ExecStart=/usr/local/bin/docker compose up --build
 Restart=no
 Type=oneshot
 
