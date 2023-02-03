@@ -24,7 +24,7 @@ def update_images(cwd: str):
     try:
         images = get_compose_images(cwd)
     except Exception as e:
-        print(f"[ERROR] Failed to get docker-compose images: {e}")
+        print(f"[ERROR] Failed to get docker compose images: {e}")
         return None
 
     prev_versions = get_latest_tag_images(images)
@@ -101,7 +101,7 @@ def main():
     description = {
         "SUCCESS": "" if error_log_count == 0 else f"But after restarted found error: {error_log_count}\n",
         "FAILED": "Please check the project manually",
-        "NOT-RESTARTABLE": "Please apply the update with `docker-compose down && docker-compose up --build -d`."
+        "NOT-RESTARTABLE": "Please apply the update with `docker compose down && docker compose up --build -d`."
     }[restart_status]
     color = {
         "SUCCESS": 0x00ff00 if error_log_count == 0 else 0xffa500,  # green or orange
