@@ -88,7 +88,7 @@ def main():
             time.sleep(10)
             error_log_count = get_error_log_count(cwd)
 
-    discord_webhook_url = os.getenv("DISCORD_WEBHOOK_URL")
+    discord_webhook_url = os.getenv("CIU_DISCORD_WEBHOOK_URL")
     if discord_webhook_url is None:
         print("[INFO] Discord webhook url id not found")
         return

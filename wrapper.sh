@@ -13,8 +13,8 @@ cd "$(dirname "$0")" || exit 1
 
 # Load webhook url from file
 if [ -f 'discord_webhook_url.txt' ]; then
-    DISCORD_WEBHOOK_URL="$(cat discord_webhook_url.txt)"
-    export DISCORD_WEBHOOK_URL
+    CIU_DISCORD_WEBHOOK_URL="$(cat discord_webhook_url.txt)"
+    export CIU_DISCORD_WEBHOOK_URL
 fi
 
 # venv
