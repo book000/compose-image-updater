@@ -94,7 +94,7 @@ def down_containers(cwd: str):
 
 
 def up_containers(cwd: str):
-    result = subprocess.run(["docker", "compose", "up", "--build"], cwd=cwd)
+    result = subprocess.run(["docker", "compose", "up", "--build", "-d"], cwd=cwd)
     return result.returncode == 0
 
 
