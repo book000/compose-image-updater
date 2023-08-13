@@ -30,4 +30,4 @@ if [ ! -d "${LOG_DIR}" ]; then
 fi
 
 DATETIME=$(date '+%Y%m%d_%H%M%S')
-find "${PROJECTS_DIR}" -maxdepth 2 -name docker-compose.yml -or -name compose.yaml -or -name compose.yml -print0 | xargs -0 dirname | xargs -L1 "${COMPOSE_IMAGE_UPDATER_DIR}/wrapper.sh" 2>&1 | tee "${LOG_DIR}/${DATETIME}.log"
+find "${PROJECTS_DIR}" -maxdepth 2 \( -name docker-compose.yml -or -name compose.yaml -or -name compose.yml \) -print0 | xargs -0 dirname | xargs -L1 "${COMPOSE_IMAGE_UPDATER_DIR}/wrapper.sh" 2>&1 | tee "${LOG_DIR}/${DATETIME}.log"
