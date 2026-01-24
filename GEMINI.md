@@ -15,7 +15,14 @@
 - 日本語と英数字の間には半角スペースを入れる。
 
 ## プロジェクト概要
-- 目的: Automatically update the latest image used in `docker-compose.yml`.
+Automatically updates Docker Compose image tags from 'latest' to actual versions with optional Discord webhook notifications.
+
+### 技術スタック
+- **言語**: Python, Bash
+- **パッケージマネージャー**: pip
+- **主要な依存関係**:
+  - python:
+    - requests==2.28.1
 
 ## コーディング規約
 - フォーマット: 既存設定（ESLint / Prettier / formatter）に従う。
@@ -23,12 +30,20 @@
 - コメント言語: 日本語
 - エラーメッセージ: 英語
 
-## 開発コマンド
+### 開発コマンド
 ```bash
-# 依存関係のインストール
+# install
 pip install -r requirements.txt
 
-# 開発 / テスト / Lint は README を確認してください
+# usage
+python -m src <project_dir>
+
+# cron
+update-all.sh /path/to/projects /path/to/logs
+
+# systemd
+ExecStartPre=/path/to/wrapper.sh
+
 ```
 
 ## 注意事項
@@ -37,3 +52,16 @@ pip install -r requirements.txt
 - 既存のプロジェクトルールがある場合はそれを優先する。
 
 ## リポジトリ固有
+- **type**: Automation Tool
+- **entry_point**: python -m src
+**functions:**
+  - Read docker-compose.yml files
+  - Extract image tags
+  - Pull latest images
+  - Update compose files
+  - Send Discord notifications
+**supported_compose_files:**
+  - docker-compose.yml
+  - compose.yaml
+  - compose.yml
+- **optional_discord_webhook**: discord_webhook_url.txt

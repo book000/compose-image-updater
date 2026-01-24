@@ -25,3 +25,16 @@
 - ログに機密情報を出力しない。
 
 ## リポジトリ固有
+- **type**: Automation Tool
+- **entry_point**: python -m src
+**functions:**
+  - Read docker-compose.yml files
+  - Extract image tags
+  - Pull latest images
+  - Update compose files
+  - Send Discord notifications
+**supported_compose_files:**
+  - docker-compose.yml
+  - compose.yaml
+  - compose.yml
+- **optional_discord_webhook**: discord_webhook_url.txt

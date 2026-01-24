@@ -13,7 +13,14 @@
 - 前提・仮定・不確実性を明示し、仮定を事実のように扱わない。
 
 ## プロジェクト概要
-- 目的: Automatically update the latest image used in `docker-compose.yml`.
+Automatically updates Docker Compose image tags from 'latest' to actual versions with optional Discord webhook notifications.
+
+### 技術スタック
+- **言語**: Python, Bash
+- **パッケージマネージャー**: pip
+- **主要な依存関係**:
+  - python:
+    - requests==2.28.1
 
 ## 重要ルール
 - 会話言語: 日本語
@@ -42,28 +49,56 @@
 - TypeScript 使用時は `skipLibCheck` で回避しない。
 - 関数やインターフェースには docstring（JSDoc など）を記載する。
 
+### コーディング規約
+- **language**: Python 3.6+
+- **package**: Python package structure with __main__.py
+- **automation**: Bash scripts for scheduling (cron, systemd)
+
 ## 相談ルール
 - Codex CLI: 実装レビュー、局所設計、整合性確認に使う。
 - Gemini CLI: 外部仕様や最新情報の確認に使う。
 - 他エージェントの指摘は黙殺せず、採用または理由を明記して不採用とする。
 
-## 開発コマンド
+### 開発コマンド
 ```bash
-# 依存関係のインストール
+# install
 pip install -r requirements.txt
 
-# 開発 / テスト / Lint は README を確認してください
+# usage
+python -m src <project_dir>
+
+# cron
+update-all.sh /path/to/projects /path/to/logs
+
+# systemd
+ExecStartPre=/path/to/wrapper.sh
+
 ```
 
-## アーキテクチャと主要ファイル
+### プロジェクト構造
+**ルートファイル:**
+- `update-all.sh`
+- `wrapper.sh`
+- `requirements.txt`
+- `generate-restartables.sh`
+
+**主要ディレクトリ:**
+- `src/`
+
+**重要ファイル:**
+- `src/__main__.py`
+- `src/__init__.py`
 
 ## 実装パターン
+- 既存のコードパターンに従う。
+- プロジェクト固有の実装ガイドラインがある場合はそれに従う。
 
 ## テスト
 - 方針: 変更内容に応じてテストを追加する。
 
 ## ドキュメント更新ルール
 - 更新タイミング: 実装確定後、同一コミットまたは追加コミットで更新する。
+- README、API ドキュメント、コメント等は常に最新状態を保つ。
 
 ## 作業チェックリスト
 
@@ -94,3 +129,16 @@ pip install -r requirements.txt
 6. PR 本文の崩れがないことを確認する。
 
 ## リポジトリ固有
+- **type**: Automation Tool
+- **entry_point**: python -m src
+**functions:**
+  - Read docker-compose.yml files
+  - Extract image tags
+  - Pull latest images
+  - Update compose files
+  - Send Discord notifications
+**supported_compose_files:**
+  - docker-compose.yml
+  - compose.yaml
+  - compose.yml
+- **optional_discord_webhook**: discord_webhook_url.txt

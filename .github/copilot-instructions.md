@@ -1,7 +1,7 @@
 # GitHub Copilot Instructions
 
 ## プロジェクト概要
-- 目的: Automatically update the latest image used in `docker-compose.yml`.
+Automatically updates Docker Compose image tags from 'latest' to actual versions with optional Discord webhook notifications.
 
 ## 共通ルール
 - 会話は日本語で行う。
@@ -11,8 +11,8 @@
 - 既存のプロジェクトルールがある場合はそれを優先する。
 
 ## 技術スタック
-- 言語: Python
-- パッケージマネージャー: pnpm 優先（ロックファイルに従う）。
+- 言語: Python, Bash
+- パッケージマネージャー: pip
 
 ## コーディング規約
 - フォーマット: 既存設定（ESLint / Prettier / formatter）に従う。
@@ -23,12 +23,20 @@
 - TypeScript 使用時は strict 前提とし、`skipLibCheck` で回避しない。
 - 関数やインターフェースには docstring（JSDoc など）を記載する。
 
-## 開発コマンド
+### 開発コマンド
 ```bash
-# 依存関係のインストール
+# install
 pip install -r requirements.txt
 
-# 開発 / テスト / Lint は README を確認してください
+# usage
+python -m src <project_dir>
+
+# cron
+update-all.sh /path/to/projects /path/to/logs
+
+# systemd
+ExecStartPre=/path/to/wrapper.sh
+
 ```
 
 ## テスト方針
@@ -39,5 +47,20 @@ pip install -r requirements.txt
 - ログに機密情報を出力しない。
 
 ## ドキュメント更新
+- 実装確定後、同一コミットまたは追加コミットで更新する。
+- README、API ドキュメント、コメント等は常に最新状態を保つ。
 
 ## リポジトリ固有
+- **type**: Automation Tool
+- **entry_point**: python -m src
+**functions:**
+  - Read docker-compose.yml files
+  - Extract image tags
+  - Pull latest images
+  - Update compose files
+  - Send Discord notifications
+**supported_compose_files:**
+  - docker-compose.yml
+  - compose.yaml
+  - compose.yml
+- **optional_discord_webhook**: discord_webhook_url.txt
