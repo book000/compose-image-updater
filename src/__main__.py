@@ -15,8 +15,13 @@ from src import (
 )
 
 
+def get_project_name(cwd: str):
+    """Return the directory name of the project, ignoring any trailing slash."""
+    return os.path.basename(os.path.abspath(cwd))
+
+
 def is_restartable_project(cwd: str):
-    """Return True if the last path component of cwd is listed in restartable_projects.json."""
+    """Return True if the project directory name is listed in restartable_projects.json."""
     path = os.path.join(
         os.path.abspath(os.path.dirname(os.path.dirname(__file__))),
         "restartable_projects.json",
@@ -25,7 +30,7 @@ def is_restartable_project(cwd: str):
         return False
     with open(path) as f:
         projects = json.load(f)
-    return cwd.split("/")[-1] in projects
+    return get_project_name(cwd) in projects
 
 
 def update_images(cwd: str):
@@ -123,7 +128,7 @@ def main():
         discord_webhook_url,
         "",
         {
-            "title": title % cwd.split("/")[-1],
+            "title": title % get_project_name(cwd),
             "description": f"{description}Target directory: {cwd}",
             "fields": [
                 {
