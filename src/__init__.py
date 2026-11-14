@@ -130,8 +130,29 @@ def get_error_log_count(cwd: str):
 
 
 def send_to_discord(discord_webhook_url, message, embed=None):
+    """Post message (and optionally one embed) to a Discord webhook.
+
+    Delivery is best-effort: failures are printed as `[ERROR]` lines and never raised.
+    Only the exception class name is logged, because requests exception messages can contain the webhook URL.
+    """
     headers = {"Content-Type": "application/json", "User-Agent": "Bot"}
-    params = {"content": message, "embeds": [embed]}
-    response = requests.post(discord_webhook_url, headers=headers, json=params)
-    print(response.status_code)
+    params = {"content": message}
+    if embed is not None:
+        params["embeds"] = [embed]
+
+    try:
+        response = requests.post(
+            discord_webhook_url, headers=headers, json=params, timeout=10
+        )
+    except requests.RequestException as e:
+        print(f"[ERROR] Failed to send Discord notification: {type(e).__name__}")
+        return
+
+    if 200 <= response.status_code < 300:
+        print(f"[INFO] Discord notification sent (HTTP {response.status_code})")
+    else:
+        print(
+            f"[ERROR] Discord webhook returned HTTP {response.status_code}: "
+            f"{response.text[:200]}"
+        )
     time.sleep(1)
