@@ -101,23 +101,25 @@ def main():
         print("[INFO] Discord webhook url id not found")
         return
 
+    status_key = "FAILED" if restart_status.startswith("FAILED") else restart_status
+
     title = {
         "SUCCESS": "Docker image updated and restarted (%s)",
         "FAILED": "Docker image updated but FAILED to restart (%s)",
         "NOT-RESTARTABLE": "Docker image updated (%s)",
-    }[restart_status]
+    }[status_key]
     description = {
         "SUCCESS": ""
         if error_log_count == 0
         else f"But after restarted found error: {error_log_count}\n",
         "FAILED": "Please check the project manually",
         "NOT-RESTARTABLE": "Please apply the update with `docker compose down && docker compose up --build -d`.",
-    }[restart_status]
+    }[status_key]
     color = {
         "SUCCESS": 0x00FF00 if error_log_count == 0 else 0xFFA500,  # green or orange
         "FAILED": 0xFF0000,  # red
         "NOT-RESTARTABLE": 0xFFFF00,  # yellow
-    }[restart_status]
+    }[status_key]
 
     send_to_discord(
         discord_webhook_url,
