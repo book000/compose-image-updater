@@ -23,7 +23,7 @@ if [ -f "${RESTARTABLE_PROJECTS_FILE}" ]; then
 fi
 
 # Generate new restartable projects file
-find "${PROJECTS_DIR}" -maxdepth 2 \( -name docker-compose.yml -or -name compose.yaml -or -name compose.yml \) -print0 | xargs -0 dirname | xargs -L1 basename | jq --raw-input --slurp 'split("\n")' > "${RESTARTABLE_PROJECTS_FILE}"
+find "${PROJECTS_DIR}" -maxdepth 2 \( -name docker-compose.yml -or -name compose.yaml -or -name compose.yml \) -print0 | xargs -0 dirname | xargs -L1 basename | jq --raw-input --slurp 'split("\n") | map(select(length > 0))' > "${RESTARTABLE_PROJECTS_FILE}"
 
 # Show diff if old file existed
 if [ -f "${OLD_RESTARTABLE_PROJECTS_FILE}" ]; then
