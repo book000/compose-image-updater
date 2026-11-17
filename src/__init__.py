@@ -9,19 +9,69 @@ class DockerCommandError(Exception):
     """Raised when a docker command fails or its output cannot be parsed."""
 
 
-def get_compose_images(cwd: str):
+def get_deployed_images(cwd: str):
+    """Return [(image_reference, full_image_id), ...], one per container of the project.
+
+    The image ID is the image each container was created from, so it stays correct
+    after a pull has moved the tag. The reference is the one written in the compose file.
+    """
     result = subprocess.run(
-        ["docker", "compose", "images"], check=False, cwd=cwd, capture_output=True
+        ["docker", "compose", "ps", "-a", "-q"],
+        check=False,
+        cwd=cwd,
+        capture_output=True,
     )
     if result.returncode != 0:
-        raise DockerCommandError("Failed to get docker compose images")
+        raise DockerCommandError("Failed to list docker compose containers")
 
-    stdout = result.stdout.decode("utf-8")
-    lines = stdout.splitlines()
-    lines = lines[1:]
-    lines = [line for line in lines if line]
-    lines = [line.split() for line in lines]
-    return lines  # [[container, repository, tag, image_id, size], ...]
+    container_ids = result.stdout.decode("utf-8").split()
+    if not container_ids:
+        return []
+
+    result = subprocess.run(
+        [
+            "docker",
+            "container",
+            "inspect",
+            "-f",
+            "{{.Image}}\t{{.Config.Image}}",
+            *container_ids,
+        ],
+        check=False,
+        capture_output=True,
+    )
+    if result.returncode != 0:
+        raise DockerCommandError("Failed to inspect docker compose containers")
+
+    deployed = []
+    for line in result.stdout.decode("utf-8").splitlines():
+        fields = line.split("\t")
+        if len(fields) != 2:
+            raise DockerCommandError(
+                f"Unexpected docker container inspect output: {line!r}"
+            )
+        image_id, reference = fields
+        deployed.append((reference, image_id))
+    return deployed
+
+
+def split_image_reference(reference: str):
+    """Return (repository, tag) of an image reference; tag is None when absent.
+
+    A reference with a digest returns the tag "@digest", which is never `latest`.
+    """
+    if "@" in reference:
+        return reference, "@digest"
+    last_segment = reference.rsplit("/", 1)[-1]
+    if ":" not in last_segment:
+        return reference, None
+    repository, tag = reference.rsplit(":", 1)
+    return repository, tag
+
+
+def is_latest_reference(reference: str):
+    """Return True if the reference is tracked: tagged `latest` or untagged."""
+    return split_image_reference(reference)[1] in ("latest", None)
 
 
 def get_image(image_name: str):
@@ -40,27 +90,6 @@ def get_image(image_name: str):
     return data
 
 
-def get_latest_tag_from_ls(image_name: str):
-    """Return the image ID of the `latest` tag of image_name from `docker image ls`, or None."""
-    result = subprocess.run(["docker", "image", "ls"], check=False, capture_output=True)
-    if result.returncode != 0:
-        raise DockerCommandError("Failed to get docker image ls")
-
-    stdout = result.stdout.decode("utf-8")
-    lines = stdout.splitlines()
-    lines = lines[1:]
-    lines = [line for line in lines if line]
-    lines = [line.split() for line in lines]
-
-    lines = list(filter(lambda img: img[0] == image_name, lines))
-    if len(lines) == 0:
-        return None
-    lines = list(filter(lambda img: img[1] == "latest", lines))
-    if len(lines) == 0:
-        return None
-    return lines[0][2]
-
-
 def get_image_version(image_data: dict):
     """Return the `org.opencontainers.image.version` label, falling back to `Created`."""
     if not image_data:
@@ -75,24 +104,12 @@ def get_image_version(image_data: dict):
     return None
 
 
-def get_latest_tag_images(images: list[list[str]]):
-    """Return {repository: version} for the `latest` images in images, or None if there are none."""
-    if len(list(filter(lambda img: img[2] == "latest", images))) == 0:
-        print("No latest tag image found")
-        return None
-
-    versions = {}
-    for image in images:
-        if image[2] != "latest":
-            continue
-
-        image_name = image[1]
-        image_id = get_latest_tag_from_ls(image_name)
-        image_data = get_image(image_id)
-        image_version = get_image_version(image_data)
-
-        versions[image_name] = image_version
-    return versions
+def get_image_identity(image_ref: str):
+    """Return (full_image_id, version) of an image ID or reference; version is "unknown" if unavailable."""
+    image_data = get_image(image_ref)
+    if not image_data or "Id" not in image_data[0]:
+        raise DockerCommandError(f"Failed to resolve image identity: {image_ref}")
+    return image_data[0]["Id"], get_image_version(image_data) or "unknown"
 
 
 def pull_images(cwd: str):

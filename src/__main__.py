@@ -5,12 +5,15 @@ import time
 from pprint import pprint
 
 from src import (
+    DockerCommandError,
     down_containers,
-    get_compose_images,
+    get_deployed_images,
     get_error_log_count,
-    get_latest_tag_images,
+    get_image_identity,
+    is_latest_reference,
     pull_images,
     send_to_discord,
+    split_image_reference,
     up_containers,
 )
 
@@ -33,36 +36,62 @@ def is_restartable_project(cwd: str):
     return get_project_name(cwd) in projects
 
 
-def update_images(cwd: str):
+def format_identity(identity: tuple[str, str]):
+    """Return "<version> (<12 hex chars of the image ID>)" for an (image_id, version) pair."""
+    image_id, version = identity
+    return f"{version} ({image_id.removeprefix('sha256:')[:12]})"
+
+
+def get_deployed_identity(image_id: str):
+    """Return (image_id, version) of a container's image, or (image_id, "unknown") if the image is gone locally.
+
+    The container's image ID is enough to compare with the pulled tag, so a missing image must not abort the run.
+    """
     try:
-        images = get_compose_images(cwd)
+        return get_image_identity(image_id)
+    except DockerCommandError as e:
+        print(f"[WARN] Deployed image {image_id} is not available locally: {e}")
+        return image_id, "unknown"
+
+
+def update_images(cwd: str):
+    """Return {repository: {"prev": ..., "current": ...}} for images whose deployed ID differs from the local `latest` tag after a pull.
+
+    Returns None when the project cannot be checked (listing containers failed, no tracked image, pull failure).
+    Raises DockerCommandError if the target image cannot be inspected after the pull.
+    """
+    try:
+        deployed = get_deployed_images(cwd)
     except Exception as e:  # noqa: BLE001  # catch everything on purpose: log the error and skip this project
         print(f"[ERROR] Failed to get docker compose images: {e}")
         return None
 
-    prev_versions = get_latest_tag_images(images)
-    if prev_versions is None:
+    deployed = [
+        (ref, image_id) for ref, image_id in deployed if is_latest_reference(ref)
+    ]
+    if not deployed:
+        print("No latest tag image found")
         return None
-    pprint(prev_versions)
+
+    prev_identities = [get_deployed_identity(image_id) for _, image_id in deployed]
+    pprint(prev_identities)
 
     update_result = pull_images(cwd)
     if not update_result:
         print("[ERROR] Failed to update images")
         return None
 
-    versions = get_latest_tag_images(images)
-    if versions is None:
-        return None
-    pprint(versions)
+    identities = [get_image_identity(ref) for ref, _ in deployed]
+    pprint(identities)
 
     update_versions = {}
-    for image_name, version in versions.items():
-        if prev_versions[image_name] == version:
+    for (ref, _), prev, current in zip(deployed, prev_identities, identities):
+        if prev[0] == current[0]:
             continue
-        update_versions[image_name] = {
-            "prev": prev_versions[image_name],
-            "current": version,
-        }
+        update_versions.setdefault(
+            split_image_reference(ref)[0],
+            {"prev": format_identity(prev), "current": format_identity(current)},
+        )
 
     return update_versions
 

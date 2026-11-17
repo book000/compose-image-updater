@@ -11,10 +11,13 @@ Guidance for AI coding agents and contributors. `CLAUDE.md` imports this file, a
 
 ## Overview
 
-`compose-image-updater` is a small Python CLI plus shell wrappers. For a Docker Compose project it runs `docker compose pull`, compares the version of every image tagged `latest` before and after, and, when something changed, optionally restarts the project and posts the result to a Discord webhook.
+`compose-image-updater` is a small Python CLI plus shell wrappers. For a Docker Compose project it runs `docker compose pull`, compares the image each container is running (its image ID) with the image the local `latest` tag points to after `docker compose pull`, and, when they differ, optionally restarts the project and posts the result to a Discord webhook.
 
-- Only images whose tag in the compose file is `latest` are tracked; other tags are not updated.
-- The version of an image is the `org.opencontainers.image.version` label, falling back to `Created`.
+- Only images tagged `latest` or untagged (Docker's default tag is `latest`) in the compose file are tracked.
+- Images with any other tag or a digest reference are not tracked or updated.
+- A differing image ID is an update, even if the version label is unchanged or an earlier run already pulled the tag, so an update that was not applied (restart failed or not restartable) is reported again on the next run.
+- The version of an image is the `org.opencontainers.image.version` label, falling back to `Created`. It is only used for display: the notification shows `<version> (<first 12 hex chars of the image ID>)`, and `unknown` when the deployed image is no longer in the local image store.
+- A project with no containers is not checked ("No latest tag image found").
 - A project is restarted (`docker compose down`, then `up --build -d`) only if its directory name is listed in `restartable_projects.json`. After a successful restart, error lines in the logs are counted in the notification (see the README).
 - The only runtime dependency is `requests`. Docker with the Compose plugin must be available.
 
@@ -27,7 +30,7 @@ Guidance for AI coding agents and contributors. `CLAUDE.md` imports this file, a
 python3 -m src /path/to/project                # run without the wrapper (needs requests installed; defaults to the current directory)
 ```
 
-There are no automated tests. CI (`.github/workflows/`, reusable workflows from `book000/templates`) runs the following; run the same locally before opening a PR:
+Tests live in `tests/` (stdlib `unittest`, mocked Docker calls, collected by `pytest` in CI) and run with `python3 -m unittest discover -s tests` (needs `requests` installed). CI (`.github/workflows/`, reusable workflows from `book000/templates`) runs the following; run the same locally before opening a PR:
 
 ```bash
 python3 -m compileall -q .
@@ -36,12 +39,13 @@ ruff format --check .
 shellcheck --severity=warning ./*.sh
 ```
 
-The Python CI also runs `pytest`, which passes when no tests are collected. Verify behavior changes manually against a real or throwaway Compose project and describe the check in the PR.
+Verify behavior changes manually against a real or throwaway Compose project and describe the check in the PR.
 
 ## Structure
 
-- `src/__main__.py`: entry point. `update_images()` pulls and diffs versions, `main()` handles restart and notification, `is_restartable_project()` reads `restartable_projects.json` from the repository root.
-- `src/__init__.py`: helpers that call `docker` through `subprocess` (list arguments, no shell), image version lookup, and `send_to_discord()`.
+- `src/__main__.py`: entry point. `update_images()` pulls and compares deployed vs target image identity, `get_deployed_identity()` and `format_identity()` look up and format an image identity for the notification, `main()` handles restart and notification, `is_restartable_project()` reads `restartable_projects.json` from the repository root.
+- `src/__init__.py`: helpers that call `docker` through `subprocess` (list arguments, no shell): `get_deployed_images()` (`docker compose ps -a -q` + `docker container inspect`, not `docker compose images`), `split_image_reference()`, `is_latest_reference()`, `get_image_identity()`, image version lookup, and `send_to_discord()`.
+- `tests/`: `unittest` tests for the helpers and `update_images()` with Docker calls mocked.
 - `wrapper.sh`: changes to its own directory, loads `discord_webhook_url.txt` into `CIU_DISCORD_WEBHOOK_URL` (the file takes precedence over an existing variable), prepares `venv`, installs `requirements.txt`, and runs `python3 -m src`. It is also used from systemd `ExecStartPre`.
 - `update-all.sh`: finds `docker-compose.yml`, `compose.yaml` and `compose.yml` in the given directory and its immediate subdirectories (`find -maxdepth 2`) and runs `wrapper.sh` per directory, teeing output to `<log dir>/<timestamp>.log`.
 - `generate-restartables.sh`: writes the names of those directories to `restartable_projects.json` and shows a diff against the previous file.

@@ -2,7 +2,7 @@
 
 Automatically updates the `latest` images used by Docker Compose projects.
 
-For each project it runs `docker compose pull` and compares the version of every `latest` image before and after. If something changed, it can restart the project and send the result to a Discord webhook.
+For each project it runs `docker compose pull` and compares the image each container is running with the image the `latest` tag points to afterwards. If they differ, it can restart the project and send the result to a Discord webhook. An update that was not applied (for example because the restart failed, or the project is not restartable) is reported again on the next run.
 
 ## Requirements
 
