@@ -10,10 +10,10 @@ class DockerCommandError(Exception):
 
 
 def get_deployed_images(cwd: str):
-    """Return [(image_reference, full_image_id), ...], one per container of the project.
+    """Return [(service, image_reference, full_image_id), ...] for project containers.
 
     The image ID is the image each container was created from, so it stays correct
-    after a pull has moved the tag. The reference is the one written in the compose file.
+    after a pull has moved the tag. The reference is the one used to create the container.
     """
     result = subprocess.run(
         ["docker", "compose", "ps", "-a", "-q"],
@@ -34,7 +34,7 @@ def get_deployed_images(cwd: str):
             "container",
             "inspect",
             "-f",
-            "{{.Image}}\t{{.Config.Image}}",
+            '{{index .Config.Labels "com.docker.compose.service"}}\t{{.Image}}\t{{.Config.Image}}',
             *container_ids,
         ],
         check=False,
@@ -46,12 +46,12 @@ def get_deployed_images(cwd: str):
     deployed = []
     for line in result.stdout.decode("utf-8").splitlines():
         fields = line.split("\t")
-        if len(fields) != 2:
+        if len(fields) != 3 or not fields[0] or fields[0] == "<no value>":
             raise DockerCommandError(
                 f"Unexpected docker container inspect output: {line!r}"
             )
-        image_id, reference = fields
-        deployed.append((reference, image_id))
+        service, image_id, reference = fields
+        deployed.append((service, reference, image_id))
     return deployed
 
 
@@ -94,11 +94,9 @@ def get_image_version(image_data: dict):
     """Return the `org.opencontainers.image.version` label, falling back to `Created`."""
     if not image_data:
         return None
-    if (
-        image_data[0]["Config"]["Labels"] is not None
-        and "org.opencontainers.image.version" in image_data[0]["Config"]["Labels"]
-    ):
-        return image_data[0]["Config"]["Labels"]["org.opencontainers.image.version"]
+    labels = image_data[0]["Config"]["Labels"]
+    if labels is not None and "org.opencontainers.image.version" in labels:
+        return labels["org.opencontainers.image.version"]
     if "Created" in image_data[0]:
         return image_data[0]["Created"]
     return None
@@ -112,19 +110,45 @@ def get_image_identity(image_ref: str):
     return image_data[0]["Id"], get_image_version(image_data) or "unknown"
 
 
-def pull_images(cwd: str):
-    result = subprocess.run(["docker", "compose", "pull"], check=False, cwd=cwd)
-    return result.returncode == 0
-
-
-def down_containers(cwd: str):
-    result = subprocess.run(["docker", "compose", "down"], check=False, cwd=cwd)
-    return result.returncode == 0
-
-
-def up_containers(cwd: str):
+def get_service_images(cwd: str):
+    """Return configured image references keyed by Compose service name."""
     result = subprocess.run(
-        ["docker", "compose", "up", "--build", "-d"], check=False, cwd=cwd
+        ["docker", "compose", "config", "--format", "json"],
+        check=False,
+        cwd=cwd,
+        capture_output=True,
+    )
+    if result.returncode != 0:
+        raise DockerCommandError("Failed to read docker compose configuration")
+    try:
+        config = json.loads(result.stdout)
+        return {
+            service: definition["image"]
+            for service, definition in config["services"].items()
+            if definition.get("image")
+        }
+    except (ValueError, KeyError, TypeError, AttributeError):
+        raise DockerCommandError(
+            "Failed to parse docker compose configuration"
+        ) from None
+
+
+def pull_images(cwd: str, services: list[str]):
+    if not services:
+        return False
+    result = subprocess.run(
+        ["docker", "compose", "pull", *services], check=False, cwd=cwd
+    )
+    return result.returncode == 0
+
+
+def up_containers(cwd: str, services: list[str]):
+    if not services:
+        return False
+    result = subprocess.run(
+        ["docker", "compose", "up", "--no-deps", "--pull", "never", "-d", *services],
+        check=False,
+        cwd=cwd,
     )
     return result.returncode == 0
 

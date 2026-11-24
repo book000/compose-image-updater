@@ -11,14 +11,14 @@ Guidance for AI coding agents and contributors. `CLAUDE.md` imports this file, a
 
 ## Overview
 
-`compose-image-updater` is a small Python CLI plus shell wrappers. For a Docker Compose project it runs `docker compose pull`, compares the image each container is running (its image ID) with the image the local `latest` tag points to after `docker compose pull`, and, when they differ, optionally restarts the project and posts the result to a Discord webhook.
+`compose-image-updater` is a small Python CLI plus shell wrappers. For a Docker Compose project it selects eligible services from the resolved configuration, pulls their images, and compares each deployed container's image ID with its configured image reference after the pull. When they differ, it optionally recreates the changed services and posts the result to a Discord webhook.
 
-- Only images tagged `latest` or untagged (Docker's default tag is `latest`) in the compose file are tracked.
-- Images with any other tag or a digest reference are not tracked or updated.
+- Only services with deployed containers and an image tagged `latest` or untagged (Docker's default tag is `latest`) in `docker compose config --format json` are tracked and pulled. Build-only services are skipped.
+- Services configured with any other tag or a digest reference are not tracked, pulled, or recreated. Eligibility uses the current configuration, even if an existing container was created with a different reference.
 - A differing image ID is an update, even if the version label is unchanged or an earlier run already pulled the tag, so an update that was not applied (restart failed or not restartable) is reported again on the next run.
 - The version of an image is the `org.opencontainers.image.version` label, falling back to `Created`. It is only used for display: the notification shows `<version> (<first 12 hex chars of the image ID>)`, and `unknown` when the deployed image is no longer in the local image store.
 - A project with no containers is not checked ("No latest tag image found").
-- A project is restarted (`docker compose down`, then `up --build -d`) only if its directory name is listed in `restartable_projects.json`. After a successful restart, error lines in the logs are counted in the notification (see the README).
+- Changed eligible services are recreated with `docker compose up --no-deps --pull never -d SERVICE...` only if the project directory name is listed in `restartable_projects.json`. No project-wide shutdown or build is performed. After a successful update, error lines in the project-wide logs are counted in the notification (see the README).
 - The only runtime dependency is `requests`. Docker with the Compose plugin must be available.
 
 ## Commands
@@ -43,8 +43,8 @@ Verify behavior changes manually against a real or throwaway Compose project and
 
 ## Structure
 
-- `src/__main__.py`: entry point. `update_images()` pulls and compares deployed vs target image identity, `get_deployed_identity()` and `format_identity()` look up and format an image identity for the notification, `main()` handles restart and notification, `is_restartable_project()` reads `restartable_projects.json` from the repository root.
-- `src/__init__.py`: helpers that call `docker` through `subprocess` (list arguments, no shell): `get_deployed_images()` (`docker compose ps -a -q` + `docker container inspect`, not `docker compose images`), `split_image_reference()`, `is_latest_reference()`, `get_image_identity()`, image version lookup, and `send_to_discord()`.
+- `src/__main__.py`: entry point. `update_images()` selects eligible deployed services, pulls them, and compares deployed vs configured image identity; `ImageUpdates` carries the changed image versions and service names. `get_deployed_identity()` and `format_identity()` look up and format an image identity for the notification, `main()` applies changes to the selected services and sends the notification, and `is_restartable_project()` reads `restartable_projects.json` from the repository root.
+- `src/__init__.py`: helpers that call `docker` through `subprocess` (list arguments, no shell): `get_deployed_images()` returns service/reference/image-ID triples using `docker compose ps -a -q` and `docker container inspect` with the `com.docker.compose.service` label; `get_service_images()` reads configured image references using `docker compose config --format json`; `pull_images()` and `up_containers()` require explicit service lists. Other helpers handle image references and identity, version lookup, project-wide logs, and `send_to_discord()`.
 - `tests/`: `unittest` tests for the helpers and `update_images()` with Docker calls mocked.
 - `wrapper.sh`: changes to its own directory, loads `discord_webhook_url.txt` into `CIU_DISCORD_WEBHOOK_URL` (the file takes precedence over an existing variable), prepares `venv`, installs `requirements.txt`, and runs `python3 -m src`. It is also used from systemd `ExecStartPre`.
 - `update-all.sh`: finds `docker-compose.yml`, `compose.yaml` and `compose.yml` in the given directory and its immediate subdirectories (`find -maxdepth 2`) and runs `wrapper.sh` per directory, teeing output to `<log dir>/<timestamp>.log`.

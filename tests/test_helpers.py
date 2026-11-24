@@ -22,14 +22,20 @@ class GetDeployedImagesTest(unittest.TestCase):
         run = mock.Mock(
             side_effect=[
                 completed("c1\nc2\n"),
-                completed("sha256:aaa\tciutest/x:latest\nsha256:bbb\tredis:7\n"),
+                completed(
+                    "web\tsha256:aaa\tciutest/x:latest\ndb\tsha256:bbb\tredis:7\n"
+                ),
             ]
         )
         with mock.patch("src.subprocess.run", run):
             result = get_deployed_images("/project")
 
         self.assertEqual(
-            result, [("ciutest/x:latest", "sha256:aaa"), ("redis:7", "sha256:bbb")]
+            result,
+            [
+                ("web", "ciutest/x:latest", "sha256:aaa"),
+                ("db", "redis:7", "sha256:bbb"),
+            ],
         )
         self.assertEqual(
             run.call_args_list[0].args[0], ["docker", "compose", "ps", "-a", "-q"]
@@ -42,7 +48,7 @@ class GetDeployedImagesTest(unittest.TestCase):
                 "container",
                 "inspect",
                 "-f",
-                "{{.Image}}\t{{.Config.Image}}",
+                '{{index .Config.Labels "com.docker.compose.service"}}\t{{.Image}}\t{{.Config.Image}}',
                 "c1",
                 "c2",
             ],

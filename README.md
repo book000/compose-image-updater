@@ -2,12 +2,12 @@
 
 Automatically updates the `latest` images used by Docker Compose projects.
 
-For each project it runs `docker compose pull` and compares the image each container is running with the image the `latest` tag points to afterwards. If they differ, it can restart the project and send the result to a Discord webhook. An update that was not applied (for example because the restart failed, or the project is not restartable) is reported again on the next run.
+For each project it selects deployed services whose images are tagged `latest` or untagged in the current Compose configuration, pulls only those services, and compares their deployed image IDs with the pulled images. If they differ, it can recreate only the changed eligible services and send the result to a Discord webhook. Services using other tags or digest references are neither pulled nor recreated, including dependencies of updated services. An update that was not applied (for example because the restart failed, or the project is not restartable) is reported again on the next run.
 
 ## Requirements
 
 - Python 3.9+ with the `venv` module
-- Docker with the Compose plugin (`docker compose`)
+- Docker with the Compose plugin (`docker compose`), supporting `config --format json` and `up --no-deps --pull never`
 - `jq`, only for `generate-restartables.sh`
 - [requests](requirements.txt), installed automatically into `venv/` by `wrapper.sh`
 
@@ -28,15 +28,15 @@ Notifications are sent only when at least one image was updated and a webhook UR
 
 ### Restarting projects
 
-By default an updated project is only reported; apply the update yourself with `docker compose down && docker compose up --build -d`.
+By default an update is only reported. Apply it yourself with `docker compose up --no-deps --pull never -d SERVICE...`, replacing `SERVICE...` with the changed eligible service names. The Discord notification includes the command for those services.
 
-To let the tool restart a project (`docker compose down`, then `docker compose up --build -d`), list its directory name in `restartable_projects.json` in the repository root:
+To let the tool apply updates with `docker compose up --no-deps --pull never -d SERVICE...`, list the project's directory name in `restartable_projects.json` in the repository root:
 
 ```json
 ["project-a", "project-b"]
 ```
 
-`./generate-restartables.sh /path/to/projects/` regenerates this file with the directory names of all projects found under the given directory and shows a diff against the previous file. Edit the result if only some projects should be restarted. After a successful restart the tool waits 10 seconds and counts `ERROR`/`error` lines in the last 100 log lines, which is shown in the notification.
+`./generate-restartables.sh /path/to/projects/` regenerates this file with the directory names of all projects found under the given directory and shows a diff against the previous file. Edit the result if only some projects should allow automatic updates. The tool does not stop the whole project or rebuild images; it recreates changed eligible services from the images already pulled. Dependencies are left running with their existing images, so start any required stopped dependencies manually. Services without deployed containers and build-only services without an image reference are skipped. After a successful update the tool waits 10 seconds and counts `ERROR`/`error` lines in the last 100 log lines, which is shown in the notification.
 
 ## Usage
 
