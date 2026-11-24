@@ -1,4 +1,5 @@
 import unittest
+from contextlib import ExitStack
 from unittest import mock
 
 from src import DockerCommandError
@@ -12,7 +13,14 @@ ID_REDIS = "sha256:" + "c" * 64
 def patched(deployed, identities, pull=True):
     """Patch the docker-facing helpers; identities maps an ID or reference to (id, version)."""
     return (
-        mock.patch("src.__main__.get_deployed_images", return_value=deployed),
+        mock.patch(
+            "src.__main__.get_deployed_images",
+            return_value=[(ref, ref, image_id) for ref, image_id in deployed],
+        ),
+        mock.patch(
+            "src.__main__.get_service_images",
+            return_value={ref: ref for ref, _ in deployed},
+        ),
         mock.patch(
             "src.__main__.get_image_identity", side_effect=identities.__getitem__
         ),
@@ -22,9 +30,11 @@ def patched(deployed, identities, pull=True):
 
 
 def run_update(deployed, identities, pull=True):
-    p1, p2, p3, p4 = patched(deployed, identities, pull)
-    with p1, p2, p3, p4:
-        return update_images("/project")
+    with ExitStack() as stack:
+        for patch in patched(deployed, identities, pull):
+            stack.enter_context(patch)
+        result = update_images("/project")
+        return result.versions if result is not None else None
 
 
 class UpdateImagesTest(unittest.TestCase):
@@ -127,13 +137,17 @@ class UpdateImagesTest(unittest.TestCase):
         with (
             mock.patch(
                 "src.__main__.get_deployed_images",
-                return_value=[("ciutest/x:latest", ID_OLD)],
+                return_value=[("web", "ciutest/x:latest", ID_OLD)],
+            ),
+            mock.patch(
+                "src.__main__.get_service_images",
+                return_value={"web": "ciutest/x:latest"},
             ),
             mock.patch("src.__main__.get_image_identity", side_effect=identity),
             mock.patch("src.__main__.pull_images", return_value=True),
             mock.patch("src.__main__.pprint"),
         ):
-            result = update_images("/project")
+            result = update_images("/project").versions
 
         self.assertEqual(
             result,
@@ -154,7 +168,11 @@ class UpdateImagesTest(unittest.TestCase):
         with (
             mock.patch(
                 "src.__main__.get_deployed_images",
-                return_value=[("ciutest/x:latest", ID_OLD)],
+                return_value=[("web", "ciutest/x:latest", ID_OLD)],
+            ),
+            mock.patch(
+                "src.__main__.get_service_images",
+                return_value={"web": "ciutest/x:latest"},
             ),
             mock.patch("src.__main__.get_image_identity", side_effect=identity),
             mock.patch("src.__main__.pull_images", return_value=True),
