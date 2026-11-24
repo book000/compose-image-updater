@@ -65,15 +65,14 @@ class ImageUpdates:
 def update_images(cwd: str):
     """Return changed image versions and service names after pulling eligible services.
 
-    Returns None when the project cannot be checked (listing containers failed, no tracked image, pull failure).
-    Raises DockerCommandError if the target image cannot be inspected after the pull.
+    Returns None when there are no eligible deployed images.
+    Raises DockerCommandError when discovery, pulling, or target image inspection fails.
     """
     try:
         deployed = get_deployed_images(cwd)
         configured = get_service_images(cwd)
-    except Exception as e:  # noqa: BLE001  # catch everything on purpose: log the error and skip this project
-        print(f"[ERROR] Failed to get docker compose images: {e}")
-        return None
+    except Exception as e:
+        raise DockerCommandError("Failed to get docker compose images") from e
 
     deployed = [
         (service, configured[service], image_id)
@@ -91,8 +90,7 @@ def update_images(cwd: str):
         cwd, list(dict.fromkeys(service for service, _, _ in deployed))
     )
     if not update_result:
-        print("[ERROR] Failed to update images")
-        return None
+        raise DockerCommandError("Failed to update images")
 
     identities = [get_image_identity(ref) for _, ref, _ in deployed]
     pprint(identities)
@@ -118,14 +116,18 @@ def main():
     else:
         cwd = os.getcwd()
 
-    res = update_images(cwd)
+    try:
+        res = update_images(cwd)
+    except (DockerCommandError, OSError) as e:
+        print(f"[ERROR] {e}")
+        return 1
     if res is None:
         print("[INFO] Target image not found")
-        return
+        return 0
 
     if not res.versions:
         print("[INFO] Update not found")
-        return
+        return 0
 
     restart_status = "NOT-RESTARTABLE"
     error_log_count = 0
@@ -139,10 +141,12 @@ def main():
         else:
             restart_status = "FAILED (UP)"
 
+    exit_status = 1 if restart_status.startswith("FAILED") else 0
+
     discord_webhook_url = os.getenv("CIU_DISCORD_WEBHOOK_URL")
     if discord_webhook_url is None:
         print("[INFO] Discord webhook url id not found")
-        return
+        return exit_status
 
     status_key = "FAILED" if restart_status.startswith("FAILED") else restart_status
 
@@ -188,6 +192,8 @@ def main():
         },
     )
 
+    return exit_status
+
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

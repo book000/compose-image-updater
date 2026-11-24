@@ -1,41 +1,39 @@
-#!/bin/sh
-COMPOSE_IMAGE_UPDATER_DIR=$(dirname "$0")
-PROJECTS_DIR="$1"
+#!/bin/bash
+set -euo pipefail
 
-echo "Projects directory: ${PROJECTS_DIR}"
+if [ "$#" -ne 1 ]; then
+    echo "Usage: $0 PROJECTS_DIR" >&2
+    exit 2
+fi
 
+COMPOSE_IMAGE_UPDATER_DIR=$(cd -P -- "$(dirname -- "$0")" && printf '%s.' "$PWD")
+COMPOSE_IMAGE_UPDATER_DIR=${COMPOSE_IMAGE_UPDATER_DIR%.}
+PROJECTS_DIR=$(cd -P -- "$1" && printf '%s.' "$PWD")
+PROJECTS_DIR=${PROJECTS_DIR%.}
 RESTARTABLE_PROJECTS_FILE="${COMPOSE_IMAGE_UPDATER_DIR}/restartable_projects.json"
-
+echo "Projects directory: ${PROJECTS_DIR}"
 echo "Restartable projects file: ${RESTARTABLE_PROJECTS_FILE}"
 
-# check if projects directory exists
-if [ ! -d "${PROJECTS_DIR}" ]; then
-    echo "Error: Projects directory[arg:1] does not exist"
-    exit 1
-fi
+WORK_DIR=$(mktemp -d)
+trap 'rm -rf -- "$WORK_DIR"' EXIT
+find "${PROJECTS_DIR}" -maxdepth 2 \( -type f -o -type l \) \( -name docker-compose.yml -o -name compose.yaml -o -name compose.yml \) -printf '%h\0' | sort -zu > "$WORK_DIR/projects"
 
-# Save old restartable projects file if it exists
-OLD_RESTARTABLE_PROJECTS_FILE=""
-if [ -f "${RESTARTABLE_PROJECTS_FILE}" ]; then
-    OLD_RESTARTABLE_PROJECTS_FILE="${RESTARTABLE_PROJECTS_FILE}.old"
-    cp "${RESTARTABLE_PROJECTS_FILE}" "${OLD_RESTARTABLE_PROJECTS_FILE}"
-    echo "Backup of existing file created: ${OLD_RESTARTABLE_PROJECTS_FILE}"
-fi
+while IFS= read -r -d '' project_dir; do
+    printf '%s\0' "${project_dir##*/}"
+done < "$WORK_DIR/projects" | jq --raw-input --slurp 'split("\u0000")[:-1] | unique' > "$WORK_DIR/restartables.json"
 
-# Generate new restartable projects file
-find "${PROJECTS_DIR}" -maxdepth 2 \( -name docker-compose.yml -or -name compose.yaml -or -name compose.yml \) -print0 | xargs -0 dirname | xargs -L1 basename | jq --raw-input --slurp 'split("\n") | map(select(length > 0))' > "${RESTARTABLE_PROJECTS_FILE}"
-
-# Show diff if old file existed
-if [ -f "${OLD_RESTARTABLE_PROJECTS_FILE}" ]; then
-    echo ""
+if [ -f "$RESTARTABLE_PROJECTS_FILE" ]; then
     echo "=== Changes in restartable projects ==="
-    if diff -u "${OLD_RESTARTABLE_PROJECTS_FILE}" "${RESTARTABLE_PROJECTS_FILE}"; then
+    if diff -u -- "$RESTARTABLE_PROJECTS_FILE" "$WORK_DIR/restartables.json"; then
         echo "No changes detected."
+    else
+        status=$?
+        if [ "$status" -ne 1 ]; then
+            exit "$status"
+        fi
     fi
     echo "========================================"
-    
-    # Clean up backup file
-    rm "${OLD_RESTARTABLE_PROJECTS_FILE}"
 else
     echo "New restartable projects file created."
 fi
+mv -- "$WORK_DIR/restartables.json" "$RESTARTABLE_PROJECTS_FILE"

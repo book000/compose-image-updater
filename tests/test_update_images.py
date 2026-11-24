@@ -181,22 +181,23 @@ class UpdateImagesTest(unittest.TestCase):
         ):
             update_images("/project")
 
-    def test_pull_failure_returns_none(self):
-        result = run_update(
-            [("ciutest/x:latest", ID_OLD)],
-            {ID_OLD: (ID_OLD, "v1"), "ciutest/x:latest": (ID_NEW, "v2")},
-            pull=False,
-        )
-        self.assertIsNone(result)
+    def test_pull_failure_raises(self):
+        with self.assertRaisesRegex(DockerCommandError, "Failed to update images"):
+            run_update(
+                [("ciutest/x:latest", ID_OLD)],
+                {ID_OLD: (ID_OLD, "v1"), "ciutest/x:latest": (ID_NEW, "v2")},
+                pull=False,
+            )
 
-    def test_docker_error_while_listing_returns_none(self):
+    def test_docker_error_while_listing_raises(self):
         with (
             mock.patch(
                 "src.__main__.get_deployed_images", side_effect=RuntimeError("boom")
             ),
             mock.patch("src.__main__.pull_images") as pull,
+            self.assertRaises(DockerCommandError),
         ):
-            self.assertIsNone(update_images("/project"))
+            update_images("/project")
         pull.assert_not_called()
 
 

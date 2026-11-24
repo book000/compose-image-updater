@@ -112,7 +112,8 @@ class ServiceScopeTest(unittest.TestCase):
                 mock.patch("src.__main__.get_service_images", side_effect=error),
                 mock.patch("src.__main__.pull_images") as pull,
             ):
-                self.assertIsNone(update_images("/project"))
+                with self.assertRaises(DockerCommandError):
+                    update_images("/project")
                 pull.assert_not_called()
 
     def test_empty_selection_never_runs_project_wide_commands(self):
@@ -166,7 +167,7 @@ class ServiceScopeTest(unittest.TestCase):
             ),
             mock.patch("src.__main__.send_to_discord") as notify,
         ):
-            main()
+            self.assertEqual(main(), 1)
         logs.assert_not_called()
         self.assertIn("FAILED", notify.call_args.args[2]["title"])
 
