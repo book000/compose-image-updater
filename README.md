@@ -6,6 +6,7 @@ For each project it selects deployed services whose images are tagged `latest` o
 
 ## Requirements
 
+- Bash, `find` supporting `-maxdepth` and `-printf`, and `sort` supporting `-z` for the shell scripts
 - Python 3.9+ with the `venv` module
 - Docker with the Compose plugin (`docker compose`), supporting `config --format json` and `up --no-deps --pull never`
 - `jq`, only for `generate-restartables.sh`
@@ -36,7 +37,7 @@ To let the tool apply updates with `docker compose up --no-deps --pull never -d 
 ["project-a", "project-b"]
 ```
 
-`./generate-restartables.sh /path/to/projects/` regenerates this file with the directory names of all projects found under the given directory and shows a diff against the previous file. Edit the result if only some projects should allow automatic updates. The tool does not stop the whole project or rebuild images; it recreates changed eligible services from the images already pulled. Dependencies are left running with their existing images, so start any required stopped dependencies manually. Services without deployed containers and build-only services without an image reference are skipped. After a successful update the tool waits 10 seconds and counts `ERROR`/`error` lines in the last 100 log lines, which is shown in the notification.
+`./generate-restartables.sh /path/to/projects/` regenerates this file with the directory names of all projects found under the given directory and shows a diff against the previous file. Names containing whitespace or quotes are preserved, duplicate names are removed, and an empty search writes `[]`. A failed search leaves the existing file unchanged. Edit the result if only some projects should allow automatic updates. The tool does not stop the whole project or rebuild images; it recreates changed eligible services from the images already pulled. Dependencies are left running with their existing images, so start any required stopped dependencies manually. Services without deployed containers and build-only services without an image reference are skipped. After a successful update the tool waits 10 seconds and counts `ERROR`/`error` lines in the last 100 log lines, which is shown in the notification.
 
 ## Usage
 
@@ -46,11 +47,11 @@ Update a single project:
 ./wrapper.sh /path/to/project
 ```
 
-If the argument is omitted, the current directory is used.
+If the argument is omitted, the current directory is used. A single relative path is resolved from the caller's directory. Extra arguments or an invalid target directory are rejected.
 
 ### Regularly update all projects
 
-`update-all.sh` runs `wrapper.sh` for every directory that contains `docker-compose.yml`, `compose.yaml` or `compose.yml` (the given directory itself and its immediate subdirectories) and writes the output to `<log dir>/<timestamp>.log`. For example, add it to cron:
+`update-all.sh` runs `wrapper.sh` for every directory that contains `docker-compose.yml`, `compose.yaml` or `compose.yml` (the given directory itself and its immediate subdirectories) and writes the output to `<log dir>/<timestamp>.log`. Each project directory is processed once, even if it contains multiple matching files, and relative paths and names containing whitespace or quotes are supported. An empty search succeeds without invoking the updater. The batch continues after a project fails and returns the first failing project's exit code; discovery or log-writing errors also produce a non-zero exit status. The Python CLI and wrapper return non-zero on discovery, pull, image inspection, or automatic update failure, while no eligible images or no changes is a successful result. For example, add it to cron:
 
 ```cron
 0 * * * * /path/to/compose-image-updater/update-all.sh /path/to/projects/ /path/to/logs/
